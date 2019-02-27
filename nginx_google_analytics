@@ -1,0 +1,98 @@
+# send logs for all traffic (including non-html) to google analytics
+#
+# in server block:
+#  set $google_analytics_id "UA-THECORRECT-ID";
+#  include            /srv/nginx/google_analytics;
+#
+# in location blocks:
+#  post_action @ga;
+#
+# notes: post_action has been referred to by nginx devs as a "dirty hack" and this approach may stop working one day.
+#        if so, can fall back to the js injection method
+#
+# refs:
+# https://developers.google.com/analytics/devguides/collection/protocol/v1/
+# http://developers-club.com/posts/260553/
+# https://qzaidi.github.io/2014/04/19/google-universal-analytics/
+
+userid on;
+userid_name cid;
+userid_expires 2y;
+
+set $ga_dp $uri;
+set $ga_host $host;
+
+#userid is contained in uid_got or uid_set, depending on if it's already been set
+#also the cookie variable name is included (e.g. cid=ASDF), so no need to specify it in the query params
+set $cid $uid_got$uid_set;
+
+location @ga {
+  internal;
+
+  #don't track web asset file requests
+  if ($request_filename ~* .(gif|jpe?g|png|ico|js|css)$ ) {
+    return 200;
+    break;
+  }
+
+  #don't track robots.txt
+  if ($request_filename ~* robots.txt$ ) {
+    return 200;
+    break;
+  }
+  
+  #don't track internal requests
+  #NOTE: this requires a geo section in the http block listing CIDRs for internal addresses,
+  #usually in nginx.conf
+  #example:
+  #geo $internal_request {
+  #  default 0;
+  #    123.44.15.122/24 1;
+  #    109.34.13.98/32 1;
+  #}
+
+  if ($internal_request) {
+    return 200;
+    break;
+  }
+
+  #NOTE: this does *not* currently try to exclude requests from bots.
+  #known bots can be excluded from Google Analytics in the Admin settings under
+  #View/View Settings/Exclude all hits from known bots and spiders
+  #if its desirable to exclude specific user agents here, define a map:
+  #
+  #map $http_user_agent $bot_request {
+  #   default 0;
+  #   ~*(ahrefsbot|dotbot|semrush) 1;
+  #   ~*(yandex|baidu) 1;
+  #}
+  #
+  #then exclude these requests from being sent to Google Analytics
+  #note: these requests would still be allowed, they just wouldn't be tracked in GA
+
+  resolver 8.8.8.8 ipv6=off;
+  proxy_ignore_client_abort on;
+  proxy_next_upstream timeout;
+  proxy_connect_timeout 1s;
+
+  set $ga_api "https://www.google-analytics.com";
+  #set $ga_api "https://www.google-analytics.com/debug"; #use for debugging
+
+  #TESTING
+  #Route request to a local target to debug the constructed Measurement API url
+  #vanilla nginx will do:
+  #docker run --rm -p 8888:80 nginx:1.12
+  #or something more thorough:
+  #docker run --rm -p 8888:80 mendhak/http-https-echo
+  #set $ga_api "http://192.168.0.45:8888"; #for local testing
+
+  #NOTE: DOWNLOAD SIZE TRACKING
+  #Google Analytics doesn't track download sizes out of the box.
+  #Here we are using a custom metric (cm1) and sending the value of nginx's body_bytes_sent
+  #The custom metric has to be set up in Google Analytics (Admin/Property/Custom Definitions/Custom Metrics)
+  #and then added to a custom report (Customization/Custom Reports) before it can be visualized in Google Analytics.
+
+  proxy_set_header Host "www.google-analytics.com";
+  #NOTE: you may need to adjust the cm1 query parameter here if your Bytes custom metric isn't index 1
+  proxy_pass $ga_api/collect?v=1&dp=/$ga_host$ga_dp&dh=$ga_host&tid=$google_analytics_id&$cid&uip=$remote_addr&t=pageview&cm1=$body_bytes_sent;
+}

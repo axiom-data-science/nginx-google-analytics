@@ -1,0 +1,15 @@
+server {
+  listen              80;
+  server_name         erddap.yoursite.org;
+
+  #set $google_analytics_id and include the google_analytics file below
+  set $google_analytics_id "UA-12345678-9";
+  include            /etc/nginx/google_analytics;
+
+  location /erddap/ {
+    #your normal config goes here...
+
+    #call the @ga location as a post_action
+    post_action        @ga;
+  }
+}
