@@ -27,6 +27,10 @@ to be somewhat commonly used.
 
 __Be warned that `post_action` could possibly be removed in future versions of nginx__.
 
+## Are there other ways to track download traffic?
+
+Sure, you can aggregate and analyze web server logs!
+
 ## Google Analytics Setup
 
 In addition to configuring nginx using the example files in this repository, you
