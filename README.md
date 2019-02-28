@@ -45,7 +45,7 @@ bytes. To do so:
 1. Note the Index of the created `Bytes` metric.
 
 __The index of the Bytes metric should be prefixed with `cm` and used in the `proxy_pass` url submitted to
-Google Analytics at the bottom of the `nginx_google_analytics` file (example: `cm1`).
+Google Analytics at the bottom of the `nginx_google_analytics` file (example: `cm1`).__
 
 You must also create a custom report to visualize the custom Bytes metric (note: there is a
 lag between setting up the metric and seeing data in reports.
